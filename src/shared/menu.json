@@ -1,0 +1,7 @@
+[
+  {"number": 1, "name": "Nasi Goreng", "price": 20000, "category": "Makanan", "detail": "Nasi tumis gurih"},
+  {"number": 2, "name": "Mie Goreng", "price": 18000, "category": "Makanan", "detail": "Mie tumis favorit"},
+  {"number": 3, "name": "Ayam Goreng", "price": 25000, "category": "Makanan", "detail": "Ayam goreng renyah"},
+  {"number": 4, "name": "Es Teh", "price": 5000, "category": "Minuman", "detail": "Segar dan ringan"},
+  {"number": 5, "name": "Es Jeruk", "price": 8000, "category": "Minuman", "detail": "Jeruk peras dingin"}
+]
