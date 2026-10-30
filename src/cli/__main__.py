@@ -1,4 +1,4 @@
-from cli.app import run_cli
+from cli.app import main
 
 if __name__ == "__main__":
-    run_cli()
+    raise SystemExit(main())

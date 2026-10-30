@@ -3,7 +3,7 @@ from collections.abc import Callable
 import flet as ft
 
 from gui.theme import MENU_ICONS, Color
-from shared.restaurant import MENU, MENU_CATEGORIES, MenuItem, rupiah
+from shared.restaurant import MenuItem, rupiah
 
 
 def section_title(title: str, count: int) -> ft.Row:
@@ -16,8 +16,10 @@ def section_title(title: str, count: int) -> ft.Row:
     )
 
 
-def menu_card(item: MenuItem, on_add: Callable[[MenuItem], None]) -> ft.Container:
-    is_primary_category = bool(MENU_CATEGORIES) and item.category == MENU_CATEGORIES[0]
+def menu_card(
+    item: MenuItem, on_add: Callable[[MenuItem], None], primary_category: str
+) -> ft.Container:
+    is_primary_category = item.category == primary_category
     return ft.Container(
         col={"xs": 12, "sm": 6, "lg": 12, "xl": 6},
         padding=16,
@@ -73,17 +75,23 @@ def menu_card(item: MenuItem, on_add: Callable[[MenuItem], None]) -> ft.Containe
     )
 
 
-def menu_sections(on_add: Callable[[MenuItem], None]) -> list[ft.Control]:
+def menu_sections(
+    items: tuple[MenuItem, ...],
+    on_add: Callable[[MenuItem], None],
+    primary_category: str,
+) -> list[ft.Control]:
     menu_sections = []
-    for category in MENU_CATEGORIES:
-        entries = [item for item in MENU if item.category == category]
+    for category in dict.fromkeys(item.category for item in items):
+        entries = [item for item in items if item.category == category]
         menu_sections.extend(
             [
                 section_title(category, len(entries)),
                 ft.ResponsiveRow(
                     spacing=10,
                     run_spacing=10,
-                    controls=[menu_card(item, on_add) for item in entries],
+                    controls=[
+                        menu_card(item, on_add, primary_category) for item in entries
+                    ],
                 ),
             ]
         )

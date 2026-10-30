@@ -1,92 +1,77 @@
-import json
+import csv
 
 import pytest
 
-from shared.restaurant import MenuItem, load_menu
+from shared.restaurant import (
+    MENU_FIELDS,
+    DataFileError,
+    MenuItem,
+    RestaurantSystem,
+    load_menu,
+)
 
 
-def test_load_menu_reads_custom_records(tmp_path, monkeypatch):
-    path = tmp_path / "menu.json"
-    path.write_text(
-        json.dumps(
-            [
-                {
-                    "number": 7,
-                    "name": "Kopi",
-                    "price": 12000,
-                    "category": "Minuman",
-                    "detail": "Kopi panas",
-                }
-            ]
-        ),
-        encoding="utf-8",
+def write_menu(path, records):
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, MENU_FIELDS)
+        writer.writeheader()
+        writer.writerows(records)
+
+
+def test_csv_catalog_and_categories_are_dynamic(data_dir):
+    path = data_dir / "menu.csv"
+    write_menu(
+        path,
+        [
+            {
+                "number": 7,
+                "name": "Kopi",
+                "price": 12000,
+                "category": "Baru",
+                "detail": "Panas",
+            }
+        ],
     )
-    monkeypatch.chdir(tmp_path)
-
-    assert load_menu(path) == (MenuItem(7, "Kopi", 12000, "Minuman", "Kopi panas"),)
-    assert load_menu()[0].name == "Nasi Goreng"
+    assert load_menu(path) == (MenuItem(7, "Kopi", 12000, "Baru", "Panas"),)
+    app = RestaurantSystem(data_dir)
+    assert app.search_menu("  KOPI  ") == app.menu
+    app.add_order(7)
+    assert app.calculate_total() == 12000
 
 
 @pytest.mark.parametrize(
-    "change, error",
+    "change",
     [
-        ({"number": True}, TypeError),
-        ({"number": 0}, ValueError),
-        ({"price": -1}, ValueError),
-        ({"price": "12000"}, TypeError),
-        ({"name": " "}, ValueError),
-        ({"category": None}, TypeError),
-        ({"detail": 3}, TypeError),
+        {"number": 0},
+        {"price": -1},
+        {"price": "bad"},
+        {"name": " "},
+        {"category": ""},
+        {"detail": ""},
     ],
 )
-def test_load_menu_rejects_invalid_fields(tmp_path, change, error):
+def test_csv_catalog_validation(data_dir, change):
     record = {
         "number": 7,
         "name": "Kopi",
         "price": 12000,
         "category": "Minuman",
-        "detail": "Kopi panas",
+        "detail": "Panas",
     }
     record.update(change)
-    path = tmp_path / "menu.json"
-    path.write_text(json.dumps([record]), encoding="utf-8")
-
-    with pytest.raises(error):
-        load_menu(path)
+    write_menu(data_dir / "menu.csv", [record])
+    with pytest.raises(DataFileError):
+        RestaurantSystem(data_dir)
 
 
-@pytest.mark.parametrize(
-    "records, error",
-    [
-        ({}, TypeError),
-        ([None], TypeError),
-        ([{}], ValueError),
-        (
-            [
-                {
-                    "number": 1,
-                    "name": "A",
-                    "price": 1,
-                    "category": "Food",
-                    "detail": "A",
-                },
-                {
-                    "number": 1,
-                    "name": "B",
-                    "price": 2,
-                    "category": "Food",
-                    "detail": "B",
-                },
-            ],
-            ValueError,
-        ),
-    ],
-)
-def test_load_menu_rejects_bad_structure_and_duplicate_numbers(
-    tmp_path, records, error
-):
-    path = tmp_path / "menu.json"
-    path.write_text(json.dumps(records), encoding="utf-8")
-
-    with pytest.raises(error):
-        load_menu(path)
+def test_duplicate_csv_menu_number_rejected(data_dir):
+    record = {
+        "number": 1,
+        "name": "Kopi",
+        "price": 12000,
+        "category": "Minuman",
+        "detail": "Panas",
+    }
+    write_menu(data_dir / "menu.csv", [record, record])
+    with pytest.raises(DataFileError, match="duplicate"):
+        RestaurantSystem(data_dir)

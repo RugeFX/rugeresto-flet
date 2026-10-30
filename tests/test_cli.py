@@ -1,98 +1,91 @@
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 from cli import run_cli
+from shared.restaurant import RestaurantSystem
 
 
-def test_cli_uses_shared_order_and_payment_rules():
-    answers = iter(["2", "1", "2", "3", "6", "30000", "6", "50000", "7"])
-    output = []
-    run_cli(read=lambda _: next(answers), write=output.append)
-    assert "1. Nasi Goreng - Rp20,000" in output
-    assert "1. Nasi Goreng x2 - Rp40,000" in output
-    assert "You still need Rp10,000" in output
-    assert "Payment : Rp50,000" in output
-    assert "Change  : Rp10,000" in output
-    assert output[-1] == "Program closed."
+def test_base_and_extended_cli_continue_the_same_saved_order(data_dir, tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(root / "src"),
+        "RUGERESTO_DATA_DIR": str(data_dir),
+    }
 
-
-@pytest.mark.parametrize(
-    "answers",
-    [
-        [
-            "1",
-            "2",
-            "3",
-            "2",
-            "2",
-            "4",
-            "1",
-            "3",
-            "4",
-            "2",
-            "3",
-            "5",
-            "1",
-            "6",
-            "1",
-            "6",
-            "20000",
-            "3",
-            "q",
-        ],
-        [
-            "3",
-            "4",
-            "5",
-            "6",
-            "bad",
-            "2",
-            "bad",
-            "2",
-            "99",
-            "2",
-            "1",
-            "bad",
-            "2",
-            "1",
-            "0",
-            "2",
-            "1",
-            "1",
-            "4",
-            "bad",
-            "4",
-            "99",
-            "4",
-            "1",
-            "bad",
-            "4",
-            "1",
-            "0",
-            "5",
-            "bad",
-            "5",
-            "99",
-            "6",
-            "bad",
-            "exit",
-        ],
-    ],
-)
-def test_cli_transcript_matches_base_reference(answers):
-    src = Path(__file__).resolve().parents[1] / "src"
-    transcripts = []
-    for entry in ([str(src / "base.py")], ["-m", "cli"]):
-        result = subprocess.run(
+    def run(entry, answers):
+        return subprocess.run(
             [sys.executable, *entry],
-            cwd=src,
             input="\n".join(answers) + "\n",
             text=True,
             capture_output=True,
+            cwd=tmp_path,
+            env=env,
+            check=True,
+        ).stdout
+
+    base_entry = [str(root / "src/base.py"), "--data-dir", str(data_dir)]
+    run(base_entry, ["2", "1", "2", "10"])
+    paid = run(["-m", "cli"], ["3", "6", "50000", "10"])
+    assert "Restored 1 saved order line" in paid
+    assert "Nasi Goreng x2 - Rp40,000" in paid
+    assert "Change  : Rp10,000" in paid
+    history = run(base_entry, ["3", "8", "10"])
+    assert "Your order is empty" in history
+    assert "Transactions: 1 | Sales: Rp40,000" in history
+
+
+def test_cli_uses_persistent_shared_rules(data_dir):
+    answers = iter(["2", "1", "2", "6", "30000", "6", "50000", "8", "10"])
+    output = []
+    run_cli(
+        RestaurantSystem(data_dir), read=lambda _: next(answers), write=output.append
+    )
+    text = "\n".join(output)
+    assert "still need Rp10,000" in text
+    assert "Change  : Rp10,000" in text
+    assert "Transactions: 1 | Sales: Rp40,000" in text
+    assert output[-1] == "Program closed."
+    assert len(RestaurantSystem(data_dir).get_transactions()) == 1
+
+
+def test_base_and_extended_cli_match_flows_with_separate_data(data_dir, tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    other = tmp_path / "base-data"
+    shutil.copytree(data_dir, other)
+    answers = "1\n7\n NASI   GORENG \n2\n1\n2\n4\n1\n1\n3\n10" + "\n"
+    env = {**os.environ, "PYTHONPATH": str(root / "src")}
+    outputs = []
+    for entry, directory in [
+        ([str(root / "src/base.py")], other),
+        (["-m", "cli"], data_dir),
+    ]:
+        result = subprocess.run(
+            [sys.executable, *entry, "--data-dir", str(directory)],
+            input=answers,
+            text=True,
+            capture_output=True,
+            cwd=tmp_path,
+            env=env,
             check=True,
         )
-        transcripts.append(result.stdout)
-    assert transcripts[0] == transcripts[1]
+        outputs.append(result.stdout)
+        assert result.stderr == ""
+    assert outputs[0] == outputs[1]
+    restored = RestaurantSystem(data_dir)
+    assert restored.calculate_total() == 20000
+    receipt = restored.payment(30000)
+    result = subprocess.run(
+        [sys.executable, "-m", "cli", "--data-dir", str(data_dir)],
+        input=f"8\n9\n{receipt.order_id}\n10\n",
+        text=True,
+        capture_output=True,
+        cwd=tmp_path,
+        env=env,
+        check=True,
+    )
+    assert "Transactions: 1 | Sales: Rp20,000" in result.stdout
+    assert "Change  : Rp10,000" in result.stdout

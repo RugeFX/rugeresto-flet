@@ -1,134 +1,165 @@
-from collections.abc import Callable
+"""Terminal adapter for the shared CSV restaurant core."""
 
-from shared.restaurant import MENU, InsufficientPayment, RestaurantOrder
+import argparse
+from pathlib import Path
 
-Read = Callable[[str], str]
-Write = Callable[[str], None]
+from shared.restaurant import (
+    DATA_DIR,
+    DataFileError,
+    MenuItem,
+    Receipt,
+    RestaurantError,
+    RestaurantSystem,
+    normalize_text,
+)
 
 
-def show_menu(write: Write) -> None:
+def show_food_menu(items: tuple[MenuItem, ...], write=print) -> None:
     write("\n======= RESTAURANT MENU =======")
-    for item in MENU:
+    for item in items:
         write(f"{item.number}. {item.name} - Rp{item.price:,}")
     write("===============================")
 
 
-def show_order(order: RestaurantOrder, write: Write) -> None:
+def view_order(system: RestaurantSystem, write=print) -> None:
     write("\n========== YOUR ORDER ==========")
-    for number, line in enumerate(order.lines, start=1):
-        write(f"{number}. {line.item.name} x{line.quantity} - Rp{line.subtotal:,}")
+    for number, line in enumerate(system.orders, 1):
+        write(f"{number}. {line.name} x{line.quantity} - Rp{line.subtotal:,}")
     write("--------------------------------")
-    write(f"Total: Rp{order.total:,}")
+    write(f"Total: Rp{system.calculate_total():,}")
     write("================================")
 
 
-def read_number(read: Read, write: Write, prompt: str, error: str) -> int | None:
-    value = read(prompt)
-    if not value.isdecimal():
-        write(error)
-        return None
-    return int(value)
+def show_receipt(receipt: Receipt, write=print) -> None:
+    write("\n========== PAYMENT ==========")
+    write(f"Receipt : {receipt.order_id}")
+    write(f"Time    : {receipt.paid_at}")
+    for line in receipt.lines:
+        write(f"{line.name} x{line.quantity} - Rp{line.subtotal:,}")
+    write(f"Total   : Rp{receipt.total:,}")
+    write(f"Payment : Rp{receipt.paid:,}")
+    write(f"Change  : Rp{receipt.change:,}")
+    write("=============================")
 
 
-def run_cli(read: Read = input, write: Write = print) -> None:
-    order = RestaurantOrder()
+def run_cli(system: RestaurantSystem | None = None, read=input, write=print) -> None:
+    if system is None:
+        system = RestaurantSystem()
+    if system.notice:
+        write(system.notice)
+    if system.orders:
+        write(f"Restored {len(system.orders)} saved order line(s).")
     while True:
         write("\n====== RESTAURANT ORDERING SYSTEM ======")
-        for action in (
+        for text in (
             "1. Display Menu",
             "2. Add Order",
             "3. View Order",
             "4. Update Order",
             "5. Delete Order",
             "6. Payment",
-            "7. Exit",
+            "7. Search Menu",
+            "8. Transaction History",
+            "9. View Receipt",
+            "10. Exit",
         ):
-            write(action)
+            write(text)
         write("========================================")
         try:
-            choice = read("Choose an option: ")
-            if choice in ("7", "exit", "q"):
+            choice = normalize_text(read("Choose an option: "))
+            if choice in ("10", "exit", "q"):
                 write("Program closed.")
                 return
+            if choice in ("3", "4", "5", "6") and not system.orders:
+                write("\nYour order is empty.")
+                continue
             if choice == "1":
-                show_menu(write)
+                show_food_menu(system.menu, write)
             elif choice == "2":
-                show_menu(write)
-                number = read_number(
-                    read, write, "Choose menu number: ", "Invalid menu option."
-                )
-                if number is None:
-                    continue
-                item = next((item for item in MENU if item.number == number), None)
-                if item is None:
-                    write("Menu not found.")
-                    continue
-                quantity = read_number(
-                    read, write, "Enter quantity: ", "Invalid quantity."
-                )
-                if quantity is None:
-                    continue
-                if quantity <= 0:
-                    write("Quantity must be greater than 0.")
-                    continue
-                order.add(number, quantity)
+                show_food_menu(system.menu, write)
+                number = int(read("Choose menu number: ").strip())
+                quantity = int(read("Enter quantity: ").strip())
+                item = system.add_order(number, quantity)
                 write(f"{item.name} x{quantity} added to order.")
-            elif choice in ("3", "4", "5", "6"):
-                if not order.lines:
-                    write("\nYour order is empty.")
-                    continue
-                show_order(order, write)
-                if choice in ("4", "5"):
-                    verb = "update" if choice == "4" else "delete"
-                    number = read_number(
-                        read,
-                        write,
-                        f"Choose order number to {verb}: ",
-                        "Invalid order number.",
+            elif choice == "3":
+                view_order(system, write)
+            elif choice == "4":
+                view_order(system, write)
+                number = int(read("Choose order number to update: ").strip())
+                quantity = int(read("Enter new quantity: ").strip())
+                system.update_order(number, quantity)
+                write("Order updated successfully.")
+            elif choice == "5":
+                view_order(system, write)
+                number = int(read("Choose order number to delete: ").strip())
+                removed = system.delete_order(number)
+                write(f"{removed.name} removed from order.")
+            elif choice == "6":
+                view_order(system, write)
+                amount = int(read("Enter payment amount: Rp").strip())
+                receipt = system.payment(amount)
+                show_receipt(receipt, write)
+                write("Thank you for your order!")
+                if system.notice:
+                    write(system.notice)
+            elif choice == "7":
+                matches = system.search_menu(read("Search menu name: "))
+                if matches:
+                    show_food_menu(matches, write)
+                else:
+                    write("No matching menu items. Try part of a menu name.")
+            elif choice == "8":
+                receipts = system.get_transactions()
+                if not receipts:
+                    write("No paid transactions yet.")
+                for receipt in receipts:
+                    write(
+                        f"{receipt.order_id} | {receipt.paid_at} | Rp{receipt.total:,}"
                     )
-                    if number is None:
-                        continue
-                    if not 1 <= number <= len(order.lines):
-                        write("Order not found.")
-                        continue
-                    item = order.lines[number - 1].item
-                    if choice == "5":
-                        order.remove(item.number)
-                        write(f"{item.name} removed from order.")
-                    else:
-                        quantity = read_number(
-                            read, write, "Enter new quantity: ", "Invalid quantity."
-                        )
-                        if quantity is None:
-                            continue
-                        if quantity <= 0:
-                            write("Quantity must be greater than 0.")
-                            continue
-                        order.set_quantity(item.number, quantity)
-                        write("Order updated successfully.")
-                elif choice == "6":
-                    amount = read_number(
-                        read,
-                        write,
-                        "Enter payment amount: Rp",
-                        "Invalid payment amount.",
-                    )
-                    if amount is None:
-                        continue
-                    try:
-                        receipt = order.pay(amount)
-                    except InsufficientPayment as error:
-                        write("Insufficient payment.")
-                        write(f"You still need Rp{error.shortfall:,}")
-                        continue
-                    write("\n========== PAYMENT ==========")
-                    write(f"Total   : Rp{receipt.total:,}")
-                    write(f"Payment : Rp{receipt.paid:,}")
-                    write(f"Change  : Rp{receipt.change:,}")
-                    write("=============================")
-                    write("Thank you for your order!")
+                write(
+                    f"Transactions: {len(receipts)} | Sales: Rp{sum(r.total for r in receipts):,}"
+                )
+            elif choice == "9":
+                show_receipt(system.get_receipt(read("Receipt ID: ")), write)
             else:
-                write("Invalid menu option.")
+                write("Invalid menu option. Choose 1-10, exit, or q.")
         except (EOFError, KeyboardInterrupt):
-            write("\nProgram closed.")
+            write("\nProgram closed. Saved order changes are retained.")
             return
+        except RestaurantError as error:
+            write(str(error))
+        except ValueError:
+            write("Enter a whole number without currency symbols or separators.")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="CSV-backed restaurant ordering system"
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=DATA_DIR,
+        help="Directory containing the three CSV files",
+    )
+    args = parser.parse_args(argv)
+    while True:
+        try:
+            system = RestaurantSystem(args.data_dir)
+            break
+        except DataFileError as error:
+            print(error)
+            try:
+                choice = normalize_text(
+                    input("Fix the file and type retry, or q to exit: ")
+                )
+            except (EOFError, KeyboardInterrupt):
+                return 1
+            if choice not in ("retry", "r"):
+                return 1
+    run_cli(system)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

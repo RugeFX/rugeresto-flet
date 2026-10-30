@@ -1,70 +1,60 @@
 # RugeResto
 
-Aplikasi pemesanan dan pembayaran tunai restoran berbasis Python. Versi extended menyediakan **GUI berbasis Flet** dan **CLI/TUI berbasis menu teks** dengan logika pemesanan serta data menu yang sama.
+Aplikasi pemesanan dan pembayaran tunai restoran untuk UAS Programming Fundamentals.
 
+**Nama:** Ahmad Zacky · **NIM:** 24110300025
 **Repository:** [github.com/RugeFX/rugeresto-flet](https://github.com/RugeFX/rugeresto-flet)
 
-## Identitas dan dokumentasi
-
-- **Nama:** Ahmad Zacky
-- **NIM:** 24110300025
-- **Studi kasus:** sistem pemesanan dan pembayaran restoran.
-- [Dokumentasi PDF versi dasar](docs/Dokumentasi_Base_App_Restoran.pdf), berisi deskripsi program, fitur, struktur, dan catatan singkat versi extended.
+**Versi GitHub:** [`main` - UAS](https://github.com/RugeFX/rugeresto-flet/tree/main) · [`uts` - versi UTS](https://github.com/RugeFX/rugeresto-flet/tree/uts)
 
 ## Versi aplikasi
 
-| Versi | Lokasi | Deskripsi |
+| Versi | Kode | Data default |
 | --- | --- | --- |
-| Base app | `src/base.py` | Program terminal asli dalam satu file, dengan menu langsung di dalam kode. Dipertahankan sebagai referensi. |
-| Extended GUI | `src/gui/` | Antarmuka Flet dengan kartu menu, kontrol kuantitas, dan panel pembayaran. |
-| Extended CLI/TUI | `src/cli/` | Antarmuka teks interaktif dengan prompt dan output mengikuti base app. |
-| Shared | `src/shared/` | Logika pesanan dan data JSON yang digunakan kedua antarmuka extended. |
+| Base app standalone | `src/base.py`: seluruh class, CSV, dan terminal berada dalam satu file; standard library saja | `data/` |
+| GUI Flet | `src/main.py` → `src/gui/` → `src/shared/restaurant.py` | `data/` |
+| CLI extended | `src/cli/` → `src/shared/restaurant.py` | `data/` |
 
-GUI dan CLI memakai aturan yang sama, tetapi setiap sesi membuat objek pesanan sendiri. Pesanan tidak tersinkron antarproses dan hanya tersimpan selama program berjalan.
+**Kode base app tetap standalone dan terpisah.** GUI dan CLI extended memakai satu core yang sama, tanpa mengimpor `base.py`. Ketiga antarmuka memakai katalog, pesanan aktif, dan riwayat pembayaran yang sama di `data/`. Pesanan yang disimpan lewat base app dapat dilanjutkan lewat GUI/CLI extended, dan sebaliknya.
 
-## Fitur versi extended
+[Dokumentasi UAS (PDF, 2 halaman)](docs/Dokumentasi_UAS_RugeResto.pdf) merangkum fitur, class, CSV, dan cuplikan hasil eksekusi program.
 
-- Menampilkan menu menurut kategori pada GUI, serta daftar bernomor pada CLI.
-- Menambahkan item; penambahan menu yang sama memperbesar kuantitasnya.
-- Menampilkan jumlah item, subtotal setiap menu, dan total pesanan.
-- Mengubah kuantitas dan menghapus item. GUI menyediakan tombol tambah/kurang; CLI memilih nomor baris pesanan.
-- Memvalidasi nomor menu, kuantitas positif, dan nominal pembayaran berupa bilangan bulat.
-- Menolak pembayaran yang kurang dan menampilkan selisihnya.
-- Menghitung kembalian dan mengosongkan pesanan setelah pembayaran berhasil.
-- Menampilkan ringkasan pembayaran pada GUI dan terminal; GUI juga menyediakan tombol **Bayar pas**.
-- Memuat menu dari JSON dan menghasilkan kategori secara otomatis berdasarkan urutan kemunculannya dalam data.
+[Dokumentasi PDF UTS](docs/Dokumentasi_Base_App_Restoran.pdf) menjelaskan versi lama, sebelum pengembangan UAS dan migrasi CSV ini.
 
-Pembayaran adalah pencatatan tunai lokal. Aplikasi belum menyimpan riwayat transaksi, akun pengguna, atau pesanan ke basis data. File JSON menyimpan katalog menu; aplikasi hanya membacanya.
+## Fitur UAS
 
-## Persiapan
+- Class `RestaurantSystem` dengan constructor, atribut bertipe, methods, dan model `MenuItem`, `OrderLine`, `Receipt`.
+- Katalog CSV; penambahan menu yang sama memperbesar kuantitas pesanan.
+- Add, update, delete, subtotal, total, pembayaran tunai, dan kembalian.
+- Pesanan aktif disimpan setiap perubahan dan dipulihkan setelah restart.
+- Receipt itemized dengan ID, timestamp WIB (`+07:00`), harga saat pemesanan, cash, dan change.
+- Riwayat transaksi, pembukaan receipt berdasarkan ID, dan total penjualan per transaksi.
+- Pencarian menu memakai `strip()`, `lower()`, `split()`, dan `join()`; `  NASI   GORENG  ` menemukan `Nasi Goreng`.
+- Validasi input dan CSV, pesan kegagalan baca/tulis, penulisan file sementara sebelum replace.
+- Pembayaran disimpan sebelum pesanan dibersihkan; restart mengenali receipt yang sudah dibayar jika cleanup sempat gagal.
 
-Gunakan **Python 3.10 atau lebih baru** dan [uv](https://docs.astral.sh/uv/). Dependensi serta konfigurasi proyek tersedia di `pyproject.toml`; versi dependensi dikunci oleh `uv.lock`.
+GUI menyediakan pencarian, **Riwayat transaksi**, **Lihat struk**, **Muat ulang data**, tombol kuantitas, dan **Bayar pas**. Jika data awal tidak dapat dibuka, GUI menampilkan masalah dan tombol **Coba lagi**. Kategori diambil dari katalog CSV secara dinamis.
+
+## Menjalankan
+
+Python 3.10+ diperlukan. Untuk environment GUI dan pengujian, gunakan `uv sync` dari direktori repository.
+
+### Base app standalone
 
 ```bash
-git clone https://github.com/RugeFX/rugeresto-flet.git
-cd rugeresto-flet
-uv sync
+python src/base.py
 ```
 
-Jalankan perintah berikut dari direktori utama repository.
+Tidak membutuhkan Flet, modul `shared`, atau modul `cli`.
 
-## Menjalankan aplikasi
-
-### GUI desktop
+### GUI desktop / web
 
 ```bash
 uv run flet run
-```
-
-Flet menjalankan `src/main.py`, yang memanggil aplikasi pada `src/gui/app.py`.
-
-### GUI web
-
-```bash
 uv run flet run --web
 ```
 
-### CLI/TUI extended
+### CLI extended
 
 macOS / Linux:
 
@@ -79,117 +69,81 @@ $env:PYTHONPATH = "src"
 uv run python -m cli
 ```
 
-Pilihan terminal: **1** tampilkan menu, **2** tambah pesanan, **3** lihat pesanan, **4** ubah jumlah, **5** hapus pesanan, **6** bayar, dan **7** keluar. Perintah `exit` atau `q` juga menutup aplikasi.
+Urutan menu terminal untuk base maupun extended: **1** display menu, **2** add, **3** view, **4** update, **5** delete, **6** payment, **7** search, **8** transaction history, **9** view receipt, **10** exit. `q` dan `exit` juga menutup program. Update/delete terminal memilih nomor baris pesanan.
 
-### Base app
+Gunakan direktori lain yang berisi ketiga CSV untuk demonstrasi atau pengujian:
 
 ```bash
-uv run python src/base.py
+python src/base.py --data-dir /path/to/data-copy
+PYTHONPATH=src uv run python -m cli --data-dir /path/to/data-copy
+RUGERESTO_DATA_DIR=/path/to/data-copy uv run flet run
 ```
 
-Base app menggunakan data menunya sendiri, sehingga perubahan JSON hanya berlaku untuk versi extended.
+Environment `RUGERESTO_DATA_DIR` berlaku untuk core extended saja dan harus diatur sebelum proses dimulai. Untuk PowerShell gunakan `$env:RUGERESTO_DATA_DIR = "C:\path\to\data-copy"` sebelum menjalankan GUI/CLI extended.
 
-## Mengelola menu JSON
+## Data CSV
 
-Edit `src/shared/menu.json`, lalu restart GUI atau CLI. Formatnya berupa array objek:
-
-```json
-[
-  {
-    "number": 1,
-    "name": "Nasi Goreng",
-    "price": 20000,
-    "category": "Makanan",
-    "detail": "Nasi tumis gurih"
-  }
-]
-```
-
-| Kolom | Aturan |
+| File | Header |
 | --- | --- |
-| `number` | Bilangan bulat positif dan unik; digunakan sebagai ID menu. |
-| `name` | Teks nama menu yang tidak kosong. |
-| `price` | Bilangan bulat nonnegatif dalam rupiah, tanpa pemisah ribuan. |
-| `category` | Teks kategori yang tidak kosong. Kategori baru otomatis menjadi bagian menu GUI. |
-| `detail` | Teks deskripsi singkat yang tidak kosong. |
+| `menu.csv` | `number,name,price,category,detail` |
+| `active_order.csv` | `order_id,menu_number,name,unit_price,quantity` |
+| `transactions.csv` | `order_id,paid_at,menu_number,name,unit_price,quantity,line_total,order_total,paid,change` |
 
-Setiap objek harus memiliki tepat lima kolom tersebut. Loader menolak jenis data yang salah, nilai yang tidak valid, dan ID duplikat. File dicari relatif terhadap modul shared, bukan direktori kerja saat aplikasi dijalankan. Ikon serta warna tampilan diatur terpisah pada GUI; item baru memakai ikon cadangan jika tidak memiliki pemetaan khusus.
+Harga rupiah berupa bilangan bulat nonnegatif; nomor menu positif dan unik; kuantitas positif; nama/kategori/deskripsi tidak kosong. File tanpa pesanan/transaksi tetap harus memiliki header. Riwayat yang disertakan dalam repository berisi data uji lokal. CSV memakai UTF-8. Katalog JSON lama sudah dimigrasikan dan bukan lagi sumber data runtime.
 
-## Struktur proyek
+Satu receipt dapat berisi beberapa baris item dengan ID yang sama; total penjualan dihitung sekali per receipt. Mengedit katalog tidak mengubah nama/harga pada receipt lama.
+
+Jalankan satu aplikasi pada satu waktu untuk direktori data ini. Tutup base, GUI, atau CLI sebelum beralih ke antarmuka lainnya; perubahan yang sudah tersimpan akan dimuat saat aplikasi berikutnya dibuka. Gunakan **Muat ulang data** pada GUI untuk membaca ulang CSV secara manual. Jangan mengedit CSV saat aplikasi sedang menyimpan data.
+
+File hilang/rusak tidak diganti diam-diam dengan data kosong. CLI menawarkan perbaikan lalu `retry`; GUI menyediakan **Coba lagi**. Jangan menghapus file yang berisi pesanan atau transaksi penting.
+
+## Struktur
 
 ```text
 src/
+├── base.py                    # Standalone; tidak mengimpor extended
 ├── main.py                    # Launcher Flet
-├── base.py                    # Program dasar / referensi asli
-├── assets/                    # Aset aplikasi
 ├── gui/
-│   ├── __init__.py
-│   ├── __main__.py            # Entry point paket GUI
-│   ├── app.py                 # Setup halaman, state, dan event handler
-│   ├── theme.py               # Warna dan ikon
-│   └── components/
-│       ├── __init__.py
-│       ├── layout.py          # Kerangka halaman dan layout responsif
-│       ├── menu.py            # Kategori dan kartu menu
-│       ├── order_row.py       # Baris pesanan dan kontrol kuantitas
-│       └── order_panel.py     # Total, pembayaran, receipt, dan feedback
+│   ├── app.py                 # State dan event adapter
+│   ├── theme.py
+│   └── components/            # Layout, menu, order row/panel, history
 ├── cli/
-│   ├── __init__.py            # Mengekspos run_cli
-│   ├── __main__.py            # Entry point python -m cli
-│   └── app.py                 # Prompt dan alur interaksi terminal
+│   ├── __main__.py            # python -m cli
+│   └── app.py                 # Prompt dan output terminal
 └── shared/
-    ├── __init__.py
-    ├── restaurant.py          # Model data, validasi, dan aturan pesanan
-    └── menu.json              # Katalog menu versi extended
+    └── restaurant.py          # Model, search, validasi, CSV, pembayaran
 
-tests/
-├── test_restaurant.py         # Aturan pesanan dan pembayaran
-├── test_menu.py               # Pembacaan dan validasi JSON
-├── test_cli.py                # Alur CLI dan perbandingan dengan base app
-└── test_main.py               # Skenario integrasi GUI Flet
-
-docs/
-└── Dokumentasi_Base_App_Restoran.pdf
+data/                         # Data bersama base, GUI, dan CLI extended
+├── menu.csv
+├── active_order.csv
+└── transactions.csv
 ```
 
-### Logika shared
+## Interface shared
 
-`MenuItem`, `OrderLine`, dan `Receipt` adalah dataclass immutable. `MENU` berisi item yang dibaca dari JSON; `MENU_CATEGORIES` berisi kategori uniknya. GUI dan CLI berinteraksi dengan `RestaurantOrder`:
+`RestaurantSystem(data_dir)` memuat CSV; import modul tidak membaca katalog. GUI dan CLI menangani input/output, sedangkan core menangani aturan serta persistence.
 
 | Operasi | Peran |
 | --- | --- |
-| `add(number, quantity=1)` | Menambahkan item atau memperbesar kuantitas. |
-| `set_quantity(number, quantity)` | Mengganti kuantitas item yang telah dipesan. |
-| `change_quantity(number, difference)` | Menambah atau mengurangi kuantitas. |
-| `remove(number)` | Menghapus item dari pesanan. |
-| `pay(amount)` | Mengembalikan receipt dan membersihkan pesanan setelah berhasil. |
-| `lines`, `item_count`, `total` | Properti untuk membaca keadaan pesanan. |
-
-Operasi yang ditolak menimbulkan turunan `RestaurantError` dan mempertahankan pesanan. GUI mengelola state serta feedback di `app.py`; modul tampilan menerima data dan callback. CLI menerjemahkan input pengguna menjadi operasi shared yang sama.
+| `search_menu(query)` | Pencarian nama menu yang dinormalisasi. |
+| `add_order(menu_number, quantity=1)` | Tambah atau gabungkan item. |
+| `update_order(row_number, quantity)` / `delete_order(row_number)` | Operasi berdasarkan nomor baris terminal. |
+| `change_quantity(menu_number, difference)` / `remove_item(menu_number)` | Operasi berdasarkan ID menu untuk GUI. |
+| `calculate_total()` / `orders` / `menu` | Membaca snapshot untuk tampilan. |
+| `payment(amount)` | Simpan receipt lalu bersihkan pesanan. |
+| `get_transactions()` / `get_receipt(id)` | Membaca history dan rincian receipt. |
+| `refresh()` | Muat ulang data dan pulihkan cleanup pembayaran tertunda. |
 
 ## Pengujian
 
-Jalankan pengujian logika shared, JSON, dan CLI:
-
 ```bash
-uv run pytest tests/test_restaurant.py tests/test_menu.py tests/test_cli.py
+uv run pytest
 ```
 
-Pengujian CLI membandingkan transcript dengan `base.py` untuk alur normal dan input tidak valid menggunakan katalog menu referensi. Jika katalog diubah, sesuaikan ekspektasi pengujian yang memakai data menu awal.
+Pengujian memakai direktori sementara sehingga tidak mengubah data kerja. Mencakup base standalone, CSV, restart, failure recovery, CLI subprocess, serta konstruksi kontrol dan callback GUI yang memanggil core sebenarnya.
 
-`tests/test_main.py` berisi skenario integrasi GUI untuk menambah item dan membayar pas. Skenario ini memerlukan runner integrasi Flet dan bukan bagian dari perintah unit test di atas. Pengujian unit tidak membuktikan perilaku pada perangkat atau hasil build distribusi.
+Tes GUI tersebut tidak memerlukan runner Flutter dan bukan pengujian visual atau screenshot. Pengujian perangkat dan build distribusi tidak dibuktikan oleh suite ini.
 
-## Build distribusi GUI
+## Distribusi
 
-Gunakan CLI Flet melalui environment proyek:
-
-```bash
-uv run flet build apk -v      # Android
-uv run flet build ipa -v      # iOS
-uv run flet build macos -v    # macOS
-uv run flet build linux -v    # Linux
-uv run flet build windows -v # Windows
-uv run flet build web -v     # Web
-```
-
-Toolchain, host, dan signing harus disiapkan sesuai platform target. Perintah di atas adalah entry point build; keberhasilan unit test tidak berarti semua platform telah dibuild atau diuji.
+Entry point build tetap `uv run flet build <platform> -v`. Sebelum distribusi, sertakan seed CSV dalam aset paket dan tentukan lokasi data writable pada target. Layout `data/` saat ini ditujukan untuk menjalankan repository secara lokal; build Android/iOS/web statis belum diverifikasi pada migrasi ini. Toolchain dan signing mengikuti platform target.

@@ -3,15 +3,15 @@ from collections.abc import Callable
 import flet as ft
 
 from gui.theme import Color
-from shared.restaurant import MenuItem, OrderLine, rupiah
+from shared.restaurant import OrderLine, rupiah
 
 
 def order_row(
     line: OrderLine,
     on_change: Callable[[OrderLine, int], None],
-    on_remove: Callable[[MenuItem], None],
+    on_remove: Callable[[OrderLine], None],
 ) -> ft.Container:
-    item = line.item
+    item = line
     quantity = line.quantity
     return ft.Container(
         padding=ft.Padding.symmetric(vertical=13),
@@ -31,7 +31,7 @@ def order_row(
                                     color=Color.ink,
                                 ),
                                 ft.Text(
-                                    f"{rupiah(item.price)} / porsi",
+                                    f"{rupiah(item.unit_price)} / porsi",
                                     size=12,
                                     color=Color.muted,
                                 ),
@@ -52,7 +52,7 @@ def order_row(
                             icon_size=17,
                             tooltip=f"Kurangi {item.name}",
                             disabled=quantity == 1,
-                            key=f"decrease-{item.number}",
+                            key=f"decrease-{item.menu_number}",
                             on_click=lambda _, selected=line: on_change(selected, -1),
                         ),
                         ft.Container(
@@ -64,7 +64,7 @@ def order_row(
                             icon=ft.Icons.ADD,
                             icon_size=17,
                             tooltip=f"Tambah {item.name}",
-                            key=f"increase-{item.number}",
+                            key=f"increase-{item.menu_number}",
                             on_click=lambda _, selected=line: on_change(selected, 1),
                         ),
                         ft.Container(expand=True),
@@ -73,7 +73,7 @@ def order_row(
                             icon_size=19,
                             icon_color=Color.danger,
                             tooltip=f"Hapus {item.name}",
-                            key=f"remove-{item.number}",
+                            key=f"remove-{item.menu_number}",
                             on_click=lambda _, selected=item: on_remove(selected),
                         ),
                     ],

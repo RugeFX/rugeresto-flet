@@ -4,7 +4,7 @@ import flet as ft
 
 from gui.components.order_row import order_row
 from gui.theme import Color
-from shared.restaurant import MenuItem, OrderLine, Receipt, rupiah
+from shared.restaurant import OrderLine, Receipt, rupiah
 
 
 def order_panel(
@@ -16,7 +16,7 @@ def order_panel(
     notice_is_error: bool,
     receipt: Receipt | None,
     on_change: Callable[[OrderLine, int], None],
-    on_remove: Callable[[MenuItem], None],
+    on_remove: Callable[[OrderLine], None],
     payment_changed: Callable,
     pay: Callable,
     pay_exact: Callable,
@@ -89,6 +89,10 @@ def order_panel(
                             ),
                         ],
                     ),
+                    ft.Text(
+                        receipt.order_id, size=11, selectable=True, color=Color.muted
+                    ),
+                    ft.Text(receipt.paid_at, size=11, color=Color.muted),
                     ft.Text(
                         f"Total {rupiah(receipt.total)} · Dibayar {rupiah(receipt.paid)}",
                         size=12,

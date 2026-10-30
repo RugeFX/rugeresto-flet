@@ -1,1 +1,1 @@
-"""Menu data and ordering logic shared by the GUI and CLI."""
+"""UI-independent restaurant rules, models, and CSV persistence."""
